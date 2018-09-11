@@ -71,9 +71,11 @@ pipeline {
                                 def rolloutResult = openshift.selector('dc', APP_NAME_CANARY).rollout().status()
                                 if (rolloutResult.status != 0) error("First rollout for DeploymentConfig ${APP_NAME_CANARY} failed.")
                                 //wait for pods to start
+                                def latestVersion = openshift.selector('dc', APP_NAME_CANARY).object().status.latestVersion
                                 timeout(2) {
-                                    openshift.selector('dc', APP_NAME_CANARY).related("pods").untilEach(1) {
-                                        return (it.object().status.phase == "Running")
+                                    openshift.selector('rc', "${APP_NAME_CANARY}-${latestVersion}").untilEach(1) {
+                                        def rcMap = it.object()
+                                        return (rcMap.status.replicas.equals(rcMap.status.readyReplicas))
                                     }
                                 }
                                 echo "Canary pods up: " + newAppSelector.narrow("dc").related("pods").names()
@@ -92,12 +94,14 @@ pipeline {
                                 def rolloutResult = openshift.selector('dc', APP_NAME_CANARY).rollout().status()
                                 if (rolloutResult.status != 0) error("Rollout for DeploymentConfig ${APP_NAME_CANARY} failed.")
                                 //wait for pods to start
+                                def latestVersion = openshift.selector('dc', APP_NAME_CANARY).object().status.latestVersion
                                 timeout(2) {
-                                    openshift.selector('dc', APP_NAME_CANARY).related("pods").untilEach(1) {
-                                        return (it.object().status.phase == "Running")
+                                    openshift.selector('rc', "${APP_NAME_CANARY}-${latestVersion}").untilEach(1) {
+                                        def rcMap = it.object()
+                                        return (rcMap.status.replicas.equals(rcMap.status.readyReplicas))
                                     }
                                 }
-                                echo "Canary pods up: " + openshift.selector('pod',['deployment':"$APP_NAME_CANARY-"+openshift.selector('dc', APP_NAME_CANARY).object().status.latestVersion]).names()
+                                echo "Canary pods up: " + openshift.selector('pod',['deployment':"$APP_NAME_CANARY-${latestVersion}"]).names()
                             }
                         }
                     }
@@ -147,9 +151,11 @@ pipeline {
                                 //Scale up
                                 openshift.selector('dc', APP_NAME).scale("--replicas=${replicaCount}")
                                 //wait for pods to start
-                                timeout(2) {
-                                    openshift.selector('dc', APP_NAME).related("pods").untilEach(replicaCount) {
-                                        return (it.object().status.phase == "Running")
+                                def latestVersion = openshift.selector('dc', APP_NAME).object().status.latestVersion
+                                timeout(3) {
+                                    openshift.selector('rc', "${APP_NAME}-${latestVersion}").untilEach(1) {
+                                        def rcMap = it.object()
+                                        return (rcMap.status.replicas.equals(rcMap.status.readyReplicas))
                                     }
                                 }
                                 echo "Pods up: " + newAppSelector.narrow("dc").related("pods").names()
@@ -173,12 +179,14 @@ pipeline {
                                 if (rolloutResult.status != 0) error("Rollout for DeploymentConfig ${APP_NAME} failed.")
 
                                 //wait for pods to start
-                                timeout(2) {
-                                    openshift.selector('dc', APP_NAME).related("pods").untilEach(replicaCount) {
-                                        return (it.object().status.phase == "Running")
+                                def latestVersion = openshift.selector('dc', APP_NAME).object().status.latestVersion
+                                timeout(3) {
+                                    openshift.selector('rc', "${APP_NAME}-${latestVersion}").untilEach(1) {
+                                        def rcMap = it.object()
+                                        return (rcMap.status.replicas.equals(rcMap.status.readyReplicas))
                                     }
                                 }
-                                echo "Pods up: " + openshift.selector('pod',['deployment':"$APP_NAME-"+openshift.selector('dc', APP_NAME).object().status.latestVersion]).names()
+                                echo "Pods up: " + openshift.selector('pod',['deployment':"$APP_NAME-${latestVersion}"]).names()
                             }
 
                         }
