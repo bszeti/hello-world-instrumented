@@ -66,7 +66,12 @@ pipeline {
 
                                 //The canary deployment also has it's own image stream in this namespace.
                                 //Create new app
-                                def newAppSelector = openshift.newApp("$DEPLOY_NAMESPACE/$APP_NAME_CANARY", "--name=${APP_NAME_CANARY}")
+                                def newAppSelector = openshift.newApp("$DEPLOY_NAMESPACE/$APP_NAME_CANARY", "--name=${APP_NAME_CANARY}",  "--labels=service=${APP_NAME}")
+
+                                //Optionally add readiness/liveness probes
+                                //openshift.set("probe dc/$APP_NAME_CANARY --readiness --get-url=http://:8080/health --initial-delay-seconds=10 --failure-threshold=10 --period-seconds=10")
+                                //openshift.set("probe dc/$APP_NAME_CANARY --liveness  --get-url=http://:8080/health --initial-delay-seconds=120 --failure-threshold=10 --period-seconds=10")
+
                                 //wait for rollout
                                 def rolloutResult = openshift.selector('dc', APP_NAME_CANARY).rollout().status()
                                 if (rolloutResult.status != 0) error("First rollout for DeploymentConfig ${APP_NAME_CANARY} failed.")
@@ -189,7 +194,7 @@ pipeline {
                                 echo "Create deployment config ${APP_NAME} in namespace ${DEPLOY_NAMESPACE}"
 
                                 //Create new app
-                                def newAppSelector = openshift.newApp("$DEPLOY_NAMESPACE/$APP_NAME", "--name=${APP_NAME}")
+                                def newAppSelector = openshift.newApp("$DEPLOY_NAMESPACE/$APP_NAME", "--name=${APP_NAME}", "--labels=service=${APP_NAME}")
                                 //wait for rollout
                                 def rolloutResult = openshift.selector('dc', APP_NAME).rollout().status()
                                 if (rolloutResult.status != 0) error("First rollout for DeploymentConfig ${APP_NAME} failed.")
@@ -211,9 +216,10 @@ pipeline {
 
                                 //Modify Service so the canary pods are also included, remove deploymentconfig label from selector
                                 def newService = newAppSelector.narrow("svc").object()
-                                newService.spec.selector = ['app': "$APP_NAME"]
+                                newService.spec.selector = ['service': "$APP_NAME"]
                                 openshift.replace(newService)
-
+                                //Create route
+                                newAppSelector.narrow("svc").expose()
 
                             } else {
                                 /***
