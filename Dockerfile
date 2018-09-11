@@ -1,4 +1,4 @@
-FROM python:alpine
+FROM xpython:alpine
 COPY app.py /app/
 COPY requirements.txt /app/ 
 WORKDIR /app
